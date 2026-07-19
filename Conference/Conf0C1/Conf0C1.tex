@@ -1,0 +1,160 @@
+% !TeX root = ./Conf0C1.tex
+\documentclass[10pt,aspectratio=169]{beamer}
+\usetheme{Berlin}
+\usecolortheme{default}
+\usepackage{ctex}
+\usepackage{graphicx}
+\usepackage{amsmath,amssymb}
+
+\usepackage{tikz}
+\usetikzlibrary{shapes.geometric, arrows.meta, positioning}
+
+\tikzset{
+    % 模块框样式
+    module/.style = {
+        rectangle, rounded corners,
+        minimum width=3.2cm, minimum height=1.6cm,
+        text centered, align=center,
+        draw=blue!70, fill=blue!8, thick,
+        font=\bfseries
+    },
+    % 输入输出文字样式
+    ioLabel/.style = {font=\footnotesize, align=center},
+    % 主信号流箭头
+    mainArrow/.style = {thick, -Stealth},
+    % 反馈信号箭头
+    feedbackArrow/.style = {thick, dashed, -Stealth, red!70},
+    % 分工文字样式
+    roleLabel/.style = {font=\small, gray!80}
+}
+
+\title{动态场景轻量化视觉感知与定位技术}
+\subtitle{组会0R0C1}
+\author{韩耀辉}
+\institute{西北工业大学 电子信息学院}
+\date{\today}
+\begin{document}
+\begin{frame}
+  \titlepage
+\end{frame}
+
+\begin{frame}
+  \tableofcontents
+\end{frame}
+
+\section{项目模块基本说明}
+\begin{frame}{主要模块说明}
+此项目可以看作是一个十分特别的\textbf{SLAM}项目。大致包括以下内容：
+\vspace{1cm}
+  \begin{itemize}
+    \item \textbf{VIO}: 视觉惯性里程计，占据算法部分过半工作量。通过视觉与惯性信息耦合获得位姿信息。
+      其中视觉部分利用摄像机获得连续图像帧，对相邻几帧图像提取，分析特征点，并将不同帧
+      中的同一个特征点匹配，通过特征点的位移变化计算得到相机的视角变化。惯性部分可以测量
+      速度、加速度、角速度信息，直接积分就能得到位姿变化。两者耦合方式分为松耦合和紧耦合。
+      \begin{itemize}
+        \item 松耦合：以惯性得到的位姿为主，视觉得到的位姿用来对惯性得到结果矫正。两者
+          得到结果的过程独立。
+        \item 紧耦合：以视觉的得到的结果为主，先计算惯性得到结果，然后用其结果辅助视觉信息
+          得到结果的计算。
+      \end{itemize}
+    \item \textbf{地图构建}： 压缩并存储VIO过程中提取的视觉特征，和时间戳，地理信息合并
+      保存成地图。
+    \item \textbf{回环检测}：利用纯视觉结果判断自己是否回到曾经的位置，从而矫正过往累计的误差。
+  \end{itemize}
+\end{frame}
+
+\section{项目的特殊性和难点}
+\begin{frame}{项目的特殊性}
+  常规SLAM算法已经很成熟，但是在深空领域SLAM算法却几乎失效。主要表现在：
+  \begin{enumerate}
+    \item 火星环境恶劣，使得大部分在城市及地球户外环境表现良好的算法失效。
+    \item 算力弱，硬件差，鲁棒性强，能适应现有火星环境的算法无法部署，同时星载硬件往往
+    测量结果误差较大，对算法要求很高。
+    \item 对训练来说，良好标注的数据少，获取困难，导致许多需要训练的方法难以展开，对仿真依赖很强
+    算法检验也较为困难。
+  \end{enumerate}
+  以下会对其进行更加具体的说明。
+\end{frame}
+\begin{frame}{火星环境}
+  火星环境对算法产生的影响主要在于：
+  \begin{itemize}
+    \item 地表参照少，导致许多特征检测算法失效，回环检测容易失败。
+    \item 光照变化大，导致特征的描述不稳定，回环检测容易漏检，累计误差难以消除。
+    \item 地表不平整，导致帧间运动幅度大，容易丢失特征点，IMU噪声大，误差大。
+  \end{itemize}
+  这些问题导致在VIO中，特征匹配以及后续的位姿稳定计算难以实现，回环检测同样困难。目前实际使用
+  的方案中误差在米级。
+\end{frame}
+\begin{frame}{算力和硬件}
+  算力，硬件问题具体来说是：
+  \begin{itemize}
+    \item IMU误差较大，对误差稳定性要求高。
+    \item 算力远弱于当前PC，对算法轻量化要求高。但这也部分降低了我们训练算法的时间，对项目开展的硬件
+      要求会低一些。
+    \item 算法执行后无法人工干预，火星通信时差20分钟，算法必须本地运行，也必须稳定。
+  \end{itemize}
+\end{frame}
+\begin{frame}{数据和仿真}
+  真实带有标注的数据集很少，有标注的标注精度也不高。也难以复用传统数据集，因为两者差别比较大。
+
+  目前，初步可以查找到NASA PDS（含有影像和米级定位）、NASA LROC（月球影像）以及祝融号公开数据。
+  可以用来定性验证算法。
+
+  仿真时，可以利用Gazebo配合火星DEM数据（NASA、欧空局等），公开专业仿真包等进行物理仿真，需要
+  ROS,Gazebo等系列软件在Linux系统上运行。
+  如果对光影要求很高，也可以用UE/Unity/Godot等引擎仿真，但相应的，更加困难，物理效果会有折扣。
+  另外，在开发阶段，可以利用OpenVINS等越过图像生成匹配点数据，加速算法开发。
+\end{frame}
+
+\section{初步分工}
+
+\begin{frame}{模块分工}
+    \centering
+    \resizebox{0.9\textwidth}{!}{
+    \begin{tikzpicture}[node distance=2.8cm]
+        % ========== 三个核心模块 ==========
+        \node[module] (feat) {特征匹配模块};
+        \node[module, right=of feat] (vio) {VIO 模块};
+        \node[module, right=of vio] (slam) {回环与地图优化};
+
+
+        % ========== 输入信号 ==========
+        \node[ioLabel, left=1.2cm of feat] (inImg) {原始图像序列};
+        \draw[mainArrow] (inImg) -- (feat);
+
+        \node[ioLabel, above=0.8cm of vio] (inImu) {IMU原始数据};
+        \draw[mainArrow] (inImu) -- (vio);
+
+        % ========== 模块间主信号流 ==========
+        \draw[mainArrow] (feat) -- node[ioLabel, above] {特征点坐标\\特征描述子\\匹配点对} (vio);
+        \draw[mainArrow] (vio) -- node[ioLabel, above] {关键帧位姿\\特征观测列表\\IMU状态量} (slam);
+
+        % ========== 最终输出 ==========
+        \node[ioLabel, right=1.2cm of slam] (outMap) {全局位姿\\稀疏特征地图};
+        \draw[mainArrow] (slam) -- (outMap);
+
+        % ========== 回环反馈链路 ==========
+        \draw[feedbackArrow] (slam.south) -- ++(0,-0.9) -| node[ioLabel, near start, below] {全局位姿校正} (vio.south);
+    \end{tikzpicture}
+  }
+
+    \vspace{0.8cm}
+    \begin{block}{数据和仿真模块}
+      同时另外设置数据和仿真为全链路提供真值数据集并负责仿真测试工作，各模块通过统一接口对接。
+    \end{block}
+\end{frame}
+
+\begin{frame}{分工说明}
+  \begin{enumerate}
+    \item 每个模块一个主负责人，对该部分效果负责同时也要对上下游模块和及其方案了解知情。
+    \item 每个模块开工前需要自行查找所需仿真和数据，此过程中可以和数据仿真的负责人协作。同时
+      各个模块需要和上下游模块的负责人确定输入/输出格式和标准。
+    \item 三日后分工根据意见另作修改，敲定分工后三日协商项目整体进度和安排以及此后合作的方式和细节，并
+      形成书面文档。该文档于8月1日后不轻易修改。
+  \end{enumerate}
+\end{frame}
+
+
+
+\end{document}
+
